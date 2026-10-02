@@ -1,6 +1,7 @@
 // src/services/reviews.service.js
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../utils/errors.js';
+import { buildMeta, parsePage } from '../utils/pagination.js';
 import { mapDbError } from '../utils/dbError.js';
 
 const reviewFields = ['rating', 'comment', 'photo_url'];
@@ -95,4 +96,29 @@ export async function reportReview(userId, reviewId, input) {
   if (error) throw mapDbError(error);
 
   return { message: 'Laporan ulasan berhasil dikirim.' };
+}
+
+export async function listStoreReviews(storeId, filters) {
+  const page = parsePage(filters);
+  const { data: store, error: storeError } = await supabaseAdmin
+    .from('stores')
+    .select('id')
+    .eq('id', storeId)
+    .eq('verification_status', 'approved')
+    .maybeSingle();
+
+  if (storeError) throw mapDbError(storeError);
+  if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Toko tidak ditemukan.');
+
+  const { data, count, error } = await supabaseAdmin
+    .from('reviews')
+    .select('*', { count: 'exact' })
+    .eq('store_id', storeId)
+    .eq('is_hidden', false)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .range(page.from, page.to);
+
+  if (error) throw mapDbError(error);
+  return { data, meta: buildMeta(page.page, page.limit, count) };
 }
