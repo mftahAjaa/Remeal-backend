@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Habisin API
+  title: ReMeal API
   version: 1.0.0
   description: |
     API Platform Digital Penjualan Produk Kuliner Menjelang Jam Tutup (Habisin).
@@ -11,7 +11,7 @@ info:
 servers:
   - url: http://localhost:4000/api/v1
     description: Local development (Express.js)
-  - url: https://habisin.vercel.app/api/v1
+  - url: https://remeal.vercel.app/api/v1
     description: Production (Vercel)
 tags:
   - name: Auth
