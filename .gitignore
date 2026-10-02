@@ -22,3 +22,9 @@ pnpm-debug.log*
 Thumbs.db
 
 .sql
+docs/.sql
+
+PRD ReMeal_ Orang B.md
+docs/PRD ReMeal_ Orang B.md
+# Keep local planning files out of commits.
+

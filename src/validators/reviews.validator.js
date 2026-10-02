@@ -25,3 +25,7 @@ export const reportReviewSchema = z.object({
   reason: z.enum(['inappropriate', 'spam', 'false_information', 'other']),
   description: z.string().optional(),
 }).strict();
+
+export const replyReviewSchema = z.object({
+  reply: z.string().max(500),
+}).strict();

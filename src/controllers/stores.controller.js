@@ -14,5 +14,20 @@ export async function getStore(req, res) {
 
 export async function listStoreReviews(req, res) {
 	const result = await reviewsService.listStoreReviews(req.params.storeId, req.query);
+  return res.status(200).json(result);
+}
+
+export async function createStore(req, res) {
+	const result = await storesService.createStore(req.user.id, req.body);
+	return res.status(201).json(result);
+}
+
+export async function getMyStore(req, res) {
+	const result = await storesService.getMyStore(req.user.id);
+	return res.status(200).json(result);
+}
+
+export async function updateMyStore(req, res) {
+	const result = await storesService.updateMyStore(req.user.id, req.body);
 	return res.status(200).json(result);
 }

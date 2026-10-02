@@ -8,9 +8,14 @@ import {
   createReviewSchema,
   orderIdParamsSchema,
   reportReviewSchema,
+  replyReviewSchema,
   reviewIdParamsSchema,
   updateReviewSchema,
 } from '../validators/reviews.validator.js';
+import {
+  listReviewReportsQuerySchema,
+  moderateReviewSchema,
+} from '../validators/admin.validator.js';
 
 const router = Router();
 
@@ -37,6 +42,20 @@ router.post(
   validate(reviewIdParamsSchema, 'params'),
   validate(reportReviewSchema),
   reviewsController.reportReview,
+);
+router.get(
+  '/seller/reviews',
+  requireAuth,
+  requireRole('seller'),
+  reviewsController.listSellerReviews,
+);
+router.post(
+  '/seller/reviews/:reviewId/reply',
+  requireAuth,
+  requireRole('seller'),
+  validate(reviewIdParamsSchema, 'params'),
+  validate(replyReviewSchema),
+  reviewsController.replyToReview,
 );
 
 export default router;

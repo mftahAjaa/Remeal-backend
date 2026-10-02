@@ -1,8 +1,23 @@
-// src/services/stores.service.js
 import { supabaseAdmin } from '../config/supabase.js';
 import { AppError } from '../utils/errors.js';
 import { buildMeta, parsePage } from '../utils/pagination.js';
 import { mapDbError } from '../utils/dbError.js';
+
+const storeFields = 'id, owner_id, name, business_type, address, latitude, longitude, contact_phone, photo_url, verification_status, rejection_reason, average_rating, review_count, created_at';
+const storeQueryFields = `${storeFields},store_opening_hours(day,open_time,close_time)`;
+
+function toStoreResponse(store) {
+  const openingHours = store.opening_hours ?? store.store_opening_hours?.map((hours) => ({
+    day: hours.day,
+    open: hours.open_time.slice(0, 5),
+    close: hours.close_time.slice(0, 5),
+  })) ?? [];
+
+  return {
+    ...Object.fromEntries(storeFields.split(', ').map((field) => [field, store[field]])),
+    opening_hours: openingHours,
+  };
+}
 
 export async function listStores(filters) {
   const page = parsePage(filters);
@@ -15,7 +30,6 @@ export async function listStores(filters) {
   });
 
   if (error) throw mapDbError(error);
-
   const total = data?.[0]?.total_count ?? 0;
   return {
     data: (data ?? []).map(({ total_count, ...store }) => store),
@@ -24,30 +38,87 @@ export async function listStores(filters) {
 }
 
 export async function getStore(storeId) {
-  const { data: store, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('stores')
-    .select('id, owner_id, name, business_type, address, latitude, longitude, contact_phone, photo_url, verification_status, rejection_reason, average_rating, review_count, created_at')
+    .select(storeQueryFields)
     .eq('id', storeId)
     .eq('verification_status', 'approved')
     .maybeSingle();
 
   if (error) throw mapDbError(error);
-  if (!store) throw new AppError(404, 'STORE_NOT_FOUND', 'Toko tidak ditemukan.');
+  if (!data) throw new AppError(404, 'STORE_NOT_FOUND', 'Toko tidak ditemukan.');
+  return toStoreResponse(data);
+}
 
-  const { data: openingHours, error: hoursError } = await supabaseAdmin
-    .from('store_opening_hours')
-    .select('day, open_time, close_time')
-    .eq('store_id', storeId)
-    .order('day');
+export async function createStore(ownerId, input) {
+  const { data, error } = await supabaseAdmin.rpc('save_seller_store', {
+    p_owner: ownerId,
+    p_input: input,
+    p_create: true,
+  });
 
-  if (hoursError) throw mapDbError(hoursError);
+  if (error?.code === '23505') {
+    throw new AppError(409, 'STORE_ALREADY_EXISTS', 'Akun ini sudah memiliki toko.');
+  }
+  if (error) throw mapDbError(error);
+  return data;
+}
 
-  return {
-    ...store,
-    opening_hours: openingHours.map(({ day, open_time, close_time }) => ({
-      day,
-      open: open_time,
-      close: close_time,
-    })),
-  };
+export async function getMyStore(ownerId) {
+  const { data, error } = await supabaseAdmin
+    .from('stores')
+    .select(storeQueryFields)
+    .eq('owner_id', ownerId)
+    .maybeSingle();
+
+  if (error) throw mapDbError(error);
+  if (!data) throw new AppError(403, 'FORBIDDEN', 'Akun ini belum memiliki toko.');
+  return toStoreResponse(data);
+}
+
+export async function updateMyStore(ownerId, input) {
+  const { data, error } = await supabaseAdmin.rpc('save_seller_store', {
+    p_owner: ownerId,
+    p_input: input,
+    p_create: false,
+  });
+
+  if (error) throw mapDbError(error);
+  return data;
+}
+
+export async function listAdminStores(filters) {
+  const page = parsePage(filters);
+  let query = supabaseAdmin.from('stores').select(storeQueryFields, { count: 'exact' });
+
+  if (filters.verification_status) {
+    query = query.eq('verification_status', filters.verification_status);
+  }
+
+  const { data, count, error } = await query
+    .order('created_at', { ascending: false })
+    .range(page.from, page.to);
+
+  if (error) throw mapDbError(error);
+  return { data: data.map(toStoreResponse), meta: buildMeta(page.page, page.limit, count) };
+}
+
+export async function verifyStore(adminId, storeId, input) {
+  const { error } = await supabaseAdmin.rpc('admin_set_store_verification', {
+    p_admin: adminId,
+    p_store: storeId,
+    p_status: input.status,
+    p_reason: input.reason ?? null,
+  });
+
+  if (error) throw mapDbError(error);
+  const { data, error: storeError } = await supabaseAdmin
+    .from('stores')
+    .select(storeQueryFields)
+    .eq('id', storeId)
+    .maybeSingle();
+
+  if (storeError) throw mapDbError(storeError);
+  if (!data) throw new AppError(404, 'STORE_NOT_FOUND', 'Toko tidak ditemukan.');
+  return toStoreResponse(data);
 }

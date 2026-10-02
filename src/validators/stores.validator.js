@@ -20,3 +20,23 @@ export const storeReviewsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
+
+const businessTypes = ['umkm', 'cafe', 'warung_makan', 'supermarket', 'bakery', 'other'];
+const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+const openingHoursSchema = z.object({
+  day: z.enum(weekdays),
+  open: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  close: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+}).strict();
+
+export const storeInputSchema = z.object({
+  name: z.string(),
+  business_type: z.enum(businessTypes),
+  address: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  opening_hours: z.array(openingHoursSchema).optional(),
+  contact_phone: z.string(),
+  photo_url: z.string().url().optional(),
+}).strict();

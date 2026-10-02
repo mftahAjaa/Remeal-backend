@@ -76,7 +76,7 @@ test('cancelOrder forwards owner and order IDs to the SQL function', async () =>
   }
 });
 
-test('route index includes 29 Orang A operations and QR route precedes order ID route', () => {
+test('route index includes all 57 OpenAPI operations and QR route precedes order ID route', () => {
   const routesDirectory = path.join(projectRoot, 'src', 'routes');
   const routeFiles = readdirSync(routesDirectory).filter((file) => file.endsWith('.routes.js'));
   const routeCount = routeFiles.reduce((count, file) => {
@@ -85,7 +85,7 @@ test('route index includes 29 Orang A operations and QR route precedes order ID 
   }, 0);
   const sellerOrdersRoutes = readFileSync(path.join(routesDirectory, 'seller-orders.routes.js'), 'utf8');
 
-  assert.equal(routeCount, 29);
+  assert.equal(routeCount, 57);
   assert.ok(sellerOrdersRoutes.indexOf("'/seller/orders/verify-qr'") < sellerOrdersRoutes.indexOf("'/seller/orders/:orderId'"));
 });
 

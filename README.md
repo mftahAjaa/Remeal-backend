@@ -1,5 +1,6 @@
 # ReMeal Backend
 
+## Alur Konsumen dan Transaksi
 Backend API konsumen dan transaksi ReMeal menggunakan Node.js 20+, Express, dan Supabase.
 
 ## Menjalankan Lokal
@@ -50,3 +51,75 @@ curl -X POST http://localhost:4000/api/v1/seller/orders/verify-qr -H "Authorizat
 ```
 
 Semua endpoint konsumen dan transaksi Orang A terdaftar di `src/routes/index.js`; kontrak lengkap ada di `docs/openapi.yaml`.
+## Alur Seller dan Admin
+
+## Menjalankan
+
+```powershell
+npm install
+Copy-Item .env.example .env
+npm run dev
+```
+
+Isi `.env` dengan kredensial proyek Supabase dan secret webhook yang sesuai. Jangan commit file `.env` atau secret. Server mendengarkan port `4000` secara default.
+
+Jalankan tes lokal:
+
+```powershell
+npm test
+```
+
+## Contoh Request Tahap Orang B
+
+> Gunakan access token Supabase untuk endpoint seller dan admin. Admin memakai akun ber-role `super_admin`.
+
+Daftarkan toko sebagai seller:
+
+```sh
+curl -X POST http://localhost:4000/api/v1/stores \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Roti Pagi","business_type":"bakery","address":"Jl. Melati 1","latitude":-7.8,"longitude":110.3,"contact_phone":"08123456789"}'
+```
+
+Setujui toko sebagai admin:
+
+```sh
+curl -X PATCH http://localhost:4000/api/v1/admin/stores/STORE_ID/verification \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"approved"}'
+```
+
+Tambahkan produk untuk toko yang sudah disetujui:
+
+```sh
+curl -X POST http://localhost:4000/api/v1/seller/products \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Roti Sore","category_id":"CATEGORY_ID","normal_price":20000,"discount_price":15000,"stock":8,"sale_start_at":"2030-01-01T15:00:00Z","order_deadline_at":"2030-01-01T18:00:00Z","pickup_deadline_at":"2030-01-01T19:00:00Z"}'
+```
+
+Lihat dashboard seller dan admin:
+
+```sh
+curl http://localhost:4000/api/v1/seller/dashboard -H "Authorization: Bearer $TOKEN"
+curl http://localhost:4000/api/v1/admin/dashboard -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+Balas ulasan dan moderasi laporan sebagai seller/admin:
+
+```sh
+curl -X POST http://localhost:4000/api/v1/seller/reviews/REVIEW_ID/reply \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"reply":"Terima kasih atas ulasannya."}'
+curl -X PATCH http://localhost:4000/api/v1/admin/reviews/REVIEW_ID/moderation \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"action":"hide","note":"Ditinjau admin"}'
+```
+
+Semua error menggunakan `{ "code", "message", "details" }`; validasi gagal memakai HTTP `422`.
+
+## Database
+
+Definisi schema dan RPC dikelola di luar file yang dilacak repository; file SQL lokal dikecualikan oleh aturan ignore. Pastikan database Supabase sudah memiliki tabel dan fungsi yang dipakai backend sebelum menjalankan endpoint. Untuk upgrade database review lama, jalankan `alter table public.reviews add column if not exists consumer_name text;` melalui SQL Editor. Jangan jalankan ulang script schema penuh pada database yang sudah berisi schema.

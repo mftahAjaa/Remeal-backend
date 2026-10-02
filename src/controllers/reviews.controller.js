@@ -15,3 +15,17 @@ export async function reportReview(req, res) {
 	const result = await reviewsService.reportReview(req.user.id, req.params.reviewId, req.body);
 	return res.status(201).json(result);
 }
+
+export async function listSellerReviews(req, res) {
+	const result = await reviewsService.listSellerReviews(req.user.id);
+	return res.status(200).json(result);
+}
+
+export async function replyToReview(req, res) {
+	const result = await reviewsService.replyToReview(
+		req.user.id,
+		req.params.reviewId,
+		req.body.reply,
+	);
+	return res.status(200).json(result);
+}
