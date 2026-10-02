@@ -19,6 +19,7 @@ const databaseErrors = {
   STORE_NOT_AVAILABLE: [403, 'Toko tidak tersedia.'],
   PRODUCT_NOT_FOUND: [404, 'Produk tidak ditemukan.'],
   ORDER_NOT_FOUND: [404, 'Pesanan tidak ditemukan.'],
+  STORE_NOT_FOUND: [404, 'Toko tidak ditemukan.'],
   REVIEW_NOT_FOUND: [404, 'Ulasan tidak ditemukan.'],
 };
 
