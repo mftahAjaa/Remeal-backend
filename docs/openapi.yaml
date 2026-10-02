@@ -1,0 +1,1959 @@
+openapi: 3.0.3
+info:
+  title: Habisin API
+  version: 1.0.0
+  description: |
+    API Platform Digital Penjualan Produk Kuliner Menjelang Jam Tutup (Habisin).
+    Tim papoi - SIFest Digital Innovation Challenge 2026.
+
+    Peran pengguna: `consumer` (Konsumen), `seller` (UMKM), `super_admin` (Super Admin).
+    Autentikasi menggunakan Supabase Auth (JWT Bearer token) dengan Role-Based Access Control.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local development (Express.js)
+  - url: https://habisin.vercel.app/api/v1
+    description: Production (Vercel)
+tags:
+  - name: Auth
+    description: Registrasi dan autentikasi
+  - name: Profile
+    description: Profil pengguna
+  - name: Stores
+    description: Toko / UMKM
+  - name: Categories
+    description: Kategori produk
+  - name: Products
+    description: Pencarian produk (konsumen)
+  - name: Seller Products
+    description: Kelola produk (UMKM)
+  - name: Seller Dashboard
+    description: Dashboard UMKM
+  - name: Orders
+    description: Pemesanan konsumen
+  - name: Payments
+    description: Pembayaran
+  - name: Seller Orders
+    description: Kelola pesanan dan QR pickup (UMKM)
+  - name: Reviews
+    description: Rating dan komentar
+  - name: Admin
+    description: Fitur Super Admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ------------------------------------------------------------------ AUTH
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi akun (Konsumen atau UMKM)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Akun dibuat, OTP verifikasi dikirim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '409':
+          description: Email atau nomor HP sudah terdaftar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verifikasi email/OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, otp]
+              properties:
+                identifier:
+                  type: string
+                  description: Email atau nomor HP
+                otp:
+                  type: string
+                  example: '123456'
+      responses:
+        '200':
+          description: Verifikasi berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: OTP salah atau kedaluwarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier, password]
+              properties:
+                identifier:
+                  type: string
+                  description: Email atau nomor HP
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      responses:
+        '200':
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Minta tautan/OTP reset kata sandi
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier]
+              properties:
+                identifier:
+                  type: string
+      responses:
+        '200':
+          description: Instruksi reset dikirim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset kata sandi
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Kata sandi diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Token tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # --------------------------------------------------------------- PROFILE
+  /me:
+    get:
+      tags: [Profile]
+      summary: Ambil profil pengguna yang sedang login
+      responses:
+        '200':
+          description: Profil pengguna
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Profile]
+      summary: Perbarui profil
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                phone:
+                  type: string
+                avatar_url:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Profil diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ---------------------------------------------------------------- STORES
+  /stores:
+    get:
+      tags: [Stores]
+      summary: Daftar UMKM terdekat (hanya yang disetujui)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Latitude'
+        - $ref: '#/components/parameters/Longitude'
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+            default: 5
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar toko
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Store'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [Stores]
+      summary: Registrasi data usaha UMKM (status Menunggu Verifikasi)
+      description: Hanya untuk akun dengan peran `seller`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreInput'
+      responses:
+        '201':
+          description: Data usaha terkirim, menunggu verifikasi Super Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /stores/me:
+    get:
+      tags: [Stores]
+      summary: Ambil toko milik UMKM yang login
+      responses:
+        '200':
+          description: Data toko
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Stores]
+      summary: Perbarui data toko
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoreInput'
+      responses:
+        '200':
+          description: Toko diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /stores/{storeId}:
+    get:
+      tags: [Stores]
+      summary: Detail toko beserta rata-rata rating
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+      responses:
+        '200':
+          description: Detail toko
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /stores/{storeId}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Daftar ulasan sebuah toko
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar ulasan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Review'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+
+  # ------------------------------------------------------------ CATEGORIES
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Daftar kategori produk
+      security: []
+      responses:
+        '200':
+          description: Daftar kategori
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+  # -------------------------------------------------------------- PRODUCTS
+  /products:
+    get:
+      tags: [Products]
+      summary: Cari produk (search, kategori, harga, jarak, rating)
+      security: []
+      parameters:
+        - name: q
+          in: query
+          description: Kata kunci pencarian
+          schema:
+            type: string
+        - name: category_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: min_price
+          in: query
+          schema:
+            type: integer
+        - name: max_price
+          in: query
+          schema:
+            type: integer
+        - name: min_rating
+          in: query
+          schema:
+            type: number
+            minimum: 1
+            maximum: 5
+        - $ref: '#/components/parameters/Latitude'
+        - $ref: '#/components/parameters/Longitude'
+        - name: radius_km
+          in: query
+          schema:
+            type: number
+            default: 5
+        - name: sort
+          in: query
+          description: Urutan hasil
+          schema:
+            type: string
+            enum: [nearest, almost_gone, cheapest, highest_rating, ending_soon]
+            default: nearest
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar produk aktif
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+  /products/{productId}:
+    get:
+      tags: [Products]
+      summary: Detail produk (harga, stok, lokasi, countdown, info toko)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Detail produk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ------------------------------------------------------ SELLER PRODUCTS
+  /seller/products:
+    get:
+      tags: [Seller Products]
+      summary: Daftar produk milik UMKM
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProductStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar produk
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Seller Products]
+      summary: Tambah produk dan atur batas waktu
+      description: Hanya UMKM yang sudah berstatus `approved`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '201':
+          description: Produk dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /seller/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    patch:
+      tags: [Seller Products]
+      summary: Ubah produk (harga, stok, batas waktu, dll.)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductInput'
+      responses:
+        '200':
+          description: Produk diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Seller Products]
+      summary: Hapus produk
+      responses:
+        '204':
+          description: Produk dihapus
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /seller/products/{productId}/close:
+    post:
+      tags: [Seller Products]
+      summary: Tutup penjualan produk secara manual
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Status menjadi `closed`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ------------------------------------------------------ SELLER DASHBOARD
+  /seller/dashboard:
+    get:
+      tags: [Seller Dashboard]
+      summary: Ringkasan dashboard UMKM hari ini
+      responses:
+        '200':
+          description: Ringkasan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellerDashboard'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /seller/stock-reminders:
+    get:
+      tags: [Seller Dashboard]
+      summary: Pengingat stok (stok masih banyak menjelang batas waktu)
+      responses:
+        '200':
+          description: Daftar pengingat
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    product_id:
+                      type: string
+                      format: uuid
+                    product_name:
+                      type: string
+                    stock_remaining:
+                      type: integer
+                    minutes_to_order_deadline:
+                      type: integer
+                    message:
+                      type: string
+                      example: Stok Roti Coklat masih 12 dan batas pemesanan 30 menit lagi.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ---------------------------------------------------------------- ORDERS
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Buat pesanan (checkout) - stok dikunci sementara
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Pesanan dibuat dengan status `pending_payment`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '409':
+          description: Stok tidak cukup atau batas pemesanan sudah lewat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    get:
+      tags: [Orders]
+      summary: Riwayat pesanan konsumen
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar pesanan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Detail pesanan (termasuk QR jika sudah dibayar)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Detail pesanan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /orders/{orderId}/cancel:
+    post:
+      tags: [Orders]
+      summary: Batalkan pesanan yang belum dibayar
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Pesanan dibatalkan, stok dikembalikan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '409':
+          description: Pesanan tidak dapat dibatalkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # -------------------------------------------------------------- PAYMENTS
+  /orders/{orderId}/payment:
+    post:
+      tags: [Payments]
+      summary: Mulai pembayaran pesanan
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method]
+              properties:
+                method:
+                  type: string
+                  enum: [qris, virtual_account, ewallet]
+      responses:
+        '201':
+          description: Instruksi pembayaran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '409':
+          description: Pesanan sudah dibayar atau kedaluwarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Webhook dari payment gateway
+      description: |
+        Dipanggil payment gateway saat status pembayaran berubah. Jika berhasil,
+        sistem membuat kode pesanan + QR dan mengubah status pesanan menjadi `paid`.
+        Wajib memverifikasi signature dari gateway.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                external_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [paid, failed, expired]
+                signature:
+                  type: string
+      responses:
+        '200':
+          description: Webhook diterima
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # --------------------------------------------------------- SELLER ORDERS
+  /seller/orders:
+    get:
+      tags: [Seller Orders]
+      summary: Daftar pesanan masuk ke UMKM
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar pesanan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /seller/orders/{orderId}:
+    get:
+      tags: [Seller Orders]
+      summary: Detail pesanan (status pembayaran dan kode pengambilan)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Detail pesanan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /seller/orders/{orderId}/confirm:
+    post:
+      tags: [Seller Orders]
+      summary: Konfirmasi pesanan
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Status menjadi `confirmed`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '409':
+          description: Pesanan belum dibayar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /seller/orders/verify-qr:
+    post:
+      tags: [Seller Orders]
+      summary: Scan QR pickup untuk verifikasi dan menyelesaikan pesanan
+      description: |
+        Memverifikasi kode QR. Jika valid, belum dipakai, dan masih dalam batas
+        pengambilan, status pesanan berubah menjadi `completed` (Selesai).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_code]
+              properties:
+                qr_code:
+                  type: string
+      responses:
+        '200':
+          description: Verifikasi berhasil, pesanan selesai
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: QR tidak valid, sudah dipakai, atau melewati batas pengambilan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /seller/orders/{orderId}/complete:
+    post:
+      tags: [Seller Orders]
+      summary: Selesaikan pesanan secara manual (cadangan jika scan gagal)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Pesanan selesai
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  # --------------------------------------------------------------- REVIEWS
+  /orders/{orderId}/review:
+    post:
+      tags: [Reviews]
+      summary: Beri rating dan komentar (hanya setelah pesanan Selesai)
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '201':
+          description: Ulasan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '403':
+          description: Pesanan belum selesai atau bukan milik pengguna
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Pesanan ini sudah diulas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reviews/{reviewId}:
+    parameters:
+      - $ref: '#/components/parameters/ReviewId'
+    patch:
+      tags: [Reviews]
+      summary: Edit ulasan (dalam batas waktu tertentu)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+      responses:
+        '200':
+          description: Ulasan diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Batas waktu edit sudah lewat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reviews/{reviewId}/report:
+    post:
+      tags: [Reviews]
+      summary: Laporkan ulasan (Konsumen atau UMKM)
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: [inappropriate, spam, false_information, other]
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Laporan diterima
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+  /seller/reviews:
+    get:
+      tags: [Reviews]
+      summary: Rata-rata rating dan daftar ulasan untuk UMKM
+      responses:
+        '200':
+          description: Ringkasan ulasan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  average_rating:
+                    type: number
+                    example: 4.6
+                  total_reviews:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Review'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /seller/reviews/{reviewId}/reply:
+    post:
+      tags: [Reviews]
+      summary: Balas komentar konsumen
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reply]
+              properties:
+                reply:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Balasan tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ----------------------------------------------------------------- ADMIN
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Dashboard platform
+      responses:
+        '200':
+          description: Statistik platform
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboard'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/stores:
+    get:
+      tags: [Admin]
+      summary: Daftar UMKM (filter status verifikasi)
+      parameters:
+        - name: verification_status
+          in: query
+          schema:
+            $ref: '#/components/schemas/VerificationStatus'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar UMKM
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Store'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/stores/{storeId}/verification:
+    patch:
+      tags: [Admin]
+      summary: Setujui, tolak, atau tangguhkan (suspend) UMKM
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected, suspended]
+                reason:
+                  type: string
+                  description: Wajib saat menolak atau menangguhkan
+      responses:
+        '200':
+          description: Status verifikasi diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Daftar pengguna
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: q
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar pengguna
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Admin]
+      summary: Aktifkan atau nonaktifkan akun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Akun diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Admin]
+      summary: Hapus akun
+      responses:
+        '204':
+          description: Akun dihapus
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/review-reports:
+    get:
+      tags: [Admin]
+      summary: Daftar laporan ulasan
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, dismissed]
+            default: open
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar laporan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewReport'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/reviews/{reviewId}/moderation:
+    patch:
+      tags: [Admin]
+      summary: Moderasi ulasan (tampilkan, sembunyikan, hapus)
+      parameters:
+        - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [show, hide, delete]
+                note:
+                  type: string
+      responses:
+        '200':
+          description: Moderasi diterapkan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/categories:
+    post:
+      tags: [Admin]
+      summary: Tambah kategori produk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                icon:
+                  type: string
+      responses:
+        '201':
+          description: Kategori dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/categories/{categoryId}:
+    parameters:
+      - name: categoryId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Admin]
+      summary: Ubah kategori
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                icon:
+                  type: string
+      responses:
+        '200':
+          description: Kategori diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Admin]
+      summary: Hapus kategori
+      responses:
+        '204':
+          description: Kategori dihapus
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/orders:
+    get:
+      tags: [Admin]
+      summary: Monitoring seluruh pesanan dan status pembayaran
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: store_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar pesanan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /complaints:
+    post:
+      tags: [Admin]
+      summary: Ajukan keluhan atau pengaduan (Konsumen/UMKM)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, description]
+              properties:
+                order_id:
+                  type: string
+                  format: uuid
+                subject:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Keluhan tercatat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+  /admin/complaints:
+    get:
+      tags: [Admin]
+      summary: Daftar keluhan/pengaduan
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, in_progress, resolved]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar keluhan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Complaint'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/complaints/{complaintId}:
+    patch:
+      tags: [Admin]
+      summary: Tangani keluhan
+      parameters:
+        - name: complaintId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [in_progress, resolved]
+                resolution_note:
+                  type: string
+      responses:
+        '200':
+          description: Keluhan diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /admin/settings:
+    get:
+      tags: [Admin]
+      summary: Ambil pengaturan platform
+      responses:
+        '200':
+          description: Pengaturan platform
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSettings'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags: [Admin]
+      summary: Ubah pengaturan platform
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformSettings'
+      responses:
+        '200':
+          description: Pengaturan diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSettings'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token dari Supabase Auth
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Latitude:
+      name: lat
+      in: query
+      description: Latitude lokasi pengguna
+      schema:
+        type: number
+        format: double
+        example: -7.7956
+    Longitude:
+      name: lng
+      in: query
+      description: Longitude lokasi pengguna
+      schema:
+        type: number
+        format: double
+        example: 110.3695
+    StoreId:
+      name: storeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Token tidak ada atau tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Peran atau status akun tidak diizinkan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Data tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Data tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+          example: FORBIDDEN
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+    Role:
+      type: string
+      enum: [consumer, seller, super_admin]
+    VerificationStatus:
+      type: string
+      description: Status akun UMKM
+      enum: [pending, approved, rejected, suspended]
+    ProductStatus:
+      type: string
+      description: |
+        Tersedia = `available`, Segera Berakhir = `ending_soon`,
+        Penjualan ditutup = `closed`, Habis = `sold_out`.
+      enum: [available, ending_soon, closed, sold_out]
+    OrderStatus:
+      type: string
+      enum: [pending_payment, paid, confirmed, completed, cancelled, expired]
+
+    RegisterRequest:
+      type: object
+      required: [full_name, password, role]
+      description: Wajib mengisi `email` atau `phone`.
+      properties:
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          example: '081234567890'
+        password:
+          type: string
+          format: password
+          minLength: 8
+        role:
+          type: string
+          enum: [consumer, seller]
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        avatar_url:
+          type: string
+          format: uri
+        is_verified:
+          type: boolean
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    StoreInput:
+      type: object
+      required: [name, business_type, address, latitude, longitude, contact_phone]
+      properties:
+        name:
+          type: string
+        business_type:
+          type: string
+          enum: [umkm, cafe, warung_makan, supermarket, bakery, other]
+        address:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        opening_hours:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: string
+                enum: [mon, tue, wed, thu, fri, sat, sun]
+              open:
+                type: string
+                example: '08:00'
+              close:
+                type: string
+                example: '21:00'
+        contact_phone:
+          type: string
+        photo_url:
+          type: string
+          format: uri
+    Store:
+      allOf:
+        - $ref: '#/components/schemas/StoreInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            owner_id:
+              type: string
+              format: uuid
+            verification_status:
+              $ref: '#/components/schemas/VerificationStatus'
+            rejection_reason:
+              type: string
+            average_rating:
+              type: number
+              example: 4.5
+            review_count:
+              type: integer
+            distance_km:
+              type: number
+              description: Hanya muncul jika lat/lng dikirim
+            created_at:
+              type: string
+              format: date-time
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Roti & Kue
+        icon:
+          type: string
+
+    ProductInput:
+      type: object
+      required: [name, category_id, normal_price, discount_price, stock, sale_start_at, order_deadline_at, pickup_deadline_at]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: string
+          format: uuid
+        photo_url:
+          type: string
+          format: uri
+        normal_price:
+          type: integer
+          example: 20000
+        discount_price:
+          type: integer
+          example: 10000
+        stock:
+          type: integer
+          minimum: 0
+        sale_start_at:
+          type: string
+          format: date-time
+          description: Jam mulai dijual
+        order_deadline_at:
+          type: string
+          format: date-time
+          description: Batas pemesanan
+        pickup_deadline_at:
+          type: string
+          format: date-time
+          description: Batas pengambilan
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/ProductInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              $ref: '#/components/schemas/ProductStatus'
+            seconds_to_order_deadline:
+              type: integer
+              description: Untuk countdown di aplikasi
+            store:
+              $ref: '#/components/schemas/Store'
+            average_rating:
+              type: number
+            review_count:
+              type: integer
+            distance_km:
+              type: number
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_code:
+          type: string
+          description: Dibuat setelah pembayaran berhasil
+          example: HBS-20261001-0042
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        product:
+          $ref: '#/components/schemas/Product'
+        store_id:
+          type: string
+          format: uuid
+        consumer_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        total_price:
+          type: integer
+        note:
+          type: string
+        qr_code:
+          type: string
+          description: Payload/URL gambar QR, hanya tersedia setelah dibayar
+        payment_status:
+          type: string
+          enum: [unpaid, paid, failed, expired]
+        pickup_deadline_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        has_review:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        method:
+          type: string
+          enum: [qris, virtual_account, ewallet]
+        amount:
+          type: integer
+        status:
+          type: string
+          enum: [pending, paid, failed, expired]
+        payment_url:
+          type: string
+          format: uri
+        qris_payload:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    ReviewInput:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 1000
+        photo_url:
+          type: string
+          format: uri
+          description: Opsional
+    Review:
+      allOf:
+        - $ref: '#/components/schemas/ReviewInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            order_id:
+              type: string
+              format: uuid
+            store_id:
+              type: string
+              format: uuid
+            product_id:
+              type: string
+              format: uuid
+            consumer_name:
+              type: string
+            seller_reply:
+              type: string
+            is_hidden:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+    ReviewReport:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        review:
+          $ref: '#/components/schemas/Review'
+        reported_by:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved, dismissed]
+        created_at:
+          type: string
+          format: date-time
+
+    Complaint:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved]
+        resolution_note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SellerDashboard:
+      type: object
+      properties:
+        active_products:
+          type: integer
+        orders_today:
+          type: integer
+        products_sold:
+          type: integer
+        revenue_today:
+          type: integer
+        remaining_stock:
+          type: integer
+        average_rating:
+          type: number
+    AdminDashboard:
+      type: object
+      properties:
+        total_consumers:
+          type: integer
+        total_sellers:
+          type: integer
+        pending_verifications:
+          type: integer
+        total_transactions:
+          type: integer
+        total_gmv:
+          type: integer
+        items_saved:
+          type: integer
+          description: Jumlah produk berhasil terjual (indikasi makanan terselamatkan)
+        open_review_reports:
+          type: integer
+        user_growth:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              consumers:
+                type: integer
+              sellers:
+                type: integer
+    PlatformSettings:
+      type: object
+      properties:
+        platform_fee_percent:
+          type: number
+          example: 5
+        payment_expiry_minutes:
+          type: integer
+          example: 15
+        review_edit_window_hours:
+          type: integer
+          example: 24
+        max_search_radius_km:
+          type: number
+          example: 10
