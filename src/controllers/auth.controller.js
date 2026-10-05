@@ -6,6 +6,11 @@ export async function register(req, res) {
 	return res.status(201).json(result);
 }
 
+export async function sendOtp(req, res) {
+	const result = await authService.sendOtp(req.body);
+	return res.status(200).json(result);
+}
+
 export async function verifyOtp(req, res) {
 	const result = await authService.verifyOtp(req.body);
 	return res.status(200).json(result);

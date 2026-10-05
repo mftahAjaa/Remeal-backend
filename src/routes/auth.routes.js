@@ -8,12 +8,14 @@ import {
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  sendOtpSchema,
   verifyOtpSchema,
 } from '../validators/auth.validator.js';
 
 const router = Router();
 
 router.post('/auth/register', validate(registerSchema), authController.register);
+router.post('/auth/send-otp', validate(sendOtpSchema), authController.sendOtp);
 router.post('/auth/verify-otp', validate(verifyOtpSchema), authController.verifyOtp);
 router.post('/auth/login', validate(loginSchema), authController.login);
 router.post('/auth/logout', requireAuth, authController.logout);
