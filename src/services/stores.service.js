@@ -51,17 +51,54 @@ export async function getStore(storeId) {
 }
 
 export async function createStore(ownerId, input) {
-  const { data, error } = await supabaseAdmin.rpc('save_seller_store', {
-    p_owner: ownerId,
-    p_input: input,
-    p_create: true,
-  });
-
-  if (error?.code === '23505') {
+  // Check if store already exists
+  const { data: existing, error: existError } = await supabaseAdmin
+    .from('stores')
+    .select('id')
+    .eq('owner_id', ownerId)
+    .maybeSingle();
+  if (existError) throw mapDbError(existError);
+  if (existing) {
     throw new AppError(409, 'STORE_ALREADY_EXISTS', 'Akun ini sudah memiliki toko.');
   }
-  if (error) throw mapDbError(error);
-  return data;
+
+  // Insert store
+  const { opening_hours, ...storeData } = input;
+  const { data: newStore, error: insertError } = await supabaseAdmin
+    .from('stores')
+    .insert({
+      owner_id: ownerId,
+      ...storeData,
+      verification_status: 'pending' // default for new stores
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    if (insertError.code === '23505') {
+       throw new AppError(409, 'STORE_ALREADY_EXISTS', 'Akun ini sudah memiliki toko.');
+    }
+    throw mapDbError(insertError);
+  }
+
+  // Insert opening hours if provided
+  if (opening_hours && opening_hours.length > 0) {
+    const hoursToInsert = opening_hours.map(h => ({
+      store_id: newStore.id,
+      day: h.day,
+      open_time: h.open,
+      close_time: h.close
+    }));
+    const { error: hoursError } = await supabaseAdmin
+      .from('store_opening_hours')
+      .insert(hoursToInsert);
+    
+    if (hoursError) {
+      console.error("Failed to insert opening hours", hoursError);
+    }
+  }
+
+  return getMyStore(ownerId);
 }
 
 export async function getMyStore(ownerId) {
@@ -77,14 +114,39 @@ export async function getMyStore(ownerId) {
 }
 
 export async function updateMyStore(ownerId, input) {
-  const { data, error } = await supabaseAdmin.rpc('save_seller_store', {
-    p_owner: ownerId,
-    p_input: input,
-    p_create: false,
-  });
+  const { opening_hours, ...storeData } = input;
+  
+  // Find the store id
+  const { data: existing, error: existError } = await supabaseAdmin
+    .from('stores')
+    .select('id')
+    .eq('owner_id', ownerId)
+    .maybeSingle();
+  if (existError) throw mapDbError(existError);
+  if (!existing) throw new AppError(404, 'STORE_NOT_FOUND', 'Toko tidak ditemukan.');
+  
+  // Update store
+  const { error: updateError } = await supabaseAdmin
+    .from('stores')
+    .update(storeData)
+    .eq('id', existing.id);
+  if (updateError) throw mapDbError(updateError);
 
-  if (error) throw mapDbError(error);
-  return data;
+  // Update opening hours
+  if (opening_hours) {
+    await supabaseAdmin.from('store_opening_hours').delete().eq('store_id', existing.id);
+    if (opening_hours.length > 0) {
+      const hoursToInsert = opening_hours.map(h => ({
+        store_id: existing.id,
+        day: h.day,
+        open_time: h.open,
+        close_time: h.close
+      }));
+      await supabaseAdmin.from('store_opening_hours').insert(hoursToInsert);
+    }
+  }
+  
+  return getMyStore(ownerId);
 }
 
 export async function listAdminStores(filters) {
@@ -104,12 +166,13 @@ export async function listAdminStores(filters) {
 }
 
 export async function verifyStore(adminId, storeId, input) {
-  const { error } = await supabaseAdmin.rpc('admin_set_store_verification', {
-    p_admin: adminId,
-    p_store: storeId,
-    p_status: input.status,
-    p_reason: input.reason ?? null,
-  });
+  const { error } = await supabaseAdmin
+    .from('stores')
+    .update({
+      verification_status: input.status,
+      rejection_reason: input.reason ?? null
+    })
+    .eq('id', storeId);
 
   if (error) throw mapDbError(error);
   const { data, error: storeError } = await supabaseAdmin
