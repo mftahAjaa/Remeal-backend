@@ -10,6 +10,8 @@ Backend API konsumen dan transaksi ReMeal menggunakan Node.js 20+, Express, dan 
 3. Jalankan `npm run dev`; API tersedia di `http://localhost:4000/api/v1`.
 4. Cek `GET http://localhost:4000/health` untuk status proses.
 
+Swagger UI tersedia di `http://localhost:4000/api-docs/`; dokumen OpenAPI JSON tersedia di `http://localhost:4000/api-docs.json`.
+
 Jalankan unit/smoke tests dengan `npm test`. Integration suite Supabase memakai `.env` lokal dan mencakup read checks serta workflow write dengan fixture sementara. Fixture mencakup akun, toko, produk, pesanan, pembayaran, ulasan, dan keluhan, lalu dibersihkan. Jalankan hanya pada project Supabase non-production dengan opt-in eksplisit:
 
 ```bash

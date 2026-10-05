@@ -59,3 +59,24 @@ test('all 28 PRD operations reject requests without a bearer token', async () =>
     assert.deepEqual(Object.keys(body).sort(), ['code', 'details', 'message']);
   }
 });
+
+test('Swagger UI and JSON contract expose all OpenAPI operations', async () => {
+  const [uiResponse, specResponse] = await Promise.all([
+    fetch(`${baseUrl}/api-docs/`),
+    fetch(`${baseUrl}/api-docs.json`),
+  ]);
+
+  assert.equal(uiResponse.status, 200);
+  assert.match(await uiResponse.text(), /<title>Swagger UI<\/title>/);
+  assert.equal(specResponse.status, 200);
+
+  const spec = await specResponse.json();
+  const operationCount = Object.values(spec.paths)
+    .flatMap((path) => Object.keys(path))
+    .filter((method) => ['get', 'post', 'put', 'patch', 'delete'].includes(method))
+    .length;
+  assert.equal(operationCount, 57);
+  assert.ok(spec.components.schemas.RegisterRequest.example.password.length >= 8);
+  assert.deepEqual(spec.components.schemas.RegisterRequest.properties.role.enum, ['consumer', 'seller']);
+  assert.match(spec.paths['/auth/login'].post.description, /super_admin/);
+});

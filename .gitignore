@@ -24,7 +24,16 @@ Thumbs.db
 .sql
 docs/.sql
 
+postman-guide.md
+docs/postman-guide.md
+
+PRD ReMeal_ Orang A.md
+docs/PRD ReMeal_ Orang A.md
+
 PRD ReMeal_ Orang B.md
 docs/PRD ReMeal_ Orang B.md
+
+remeal-api.postman_collection.json
+docs/postman/remeal-api.postman_collection.json
 # Keep local planning files out of commits.
 

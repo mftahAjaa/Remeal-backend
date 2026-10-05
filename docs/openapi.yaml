@@ -48,6 +48,7 @@ paths:
     post:
       tags: [Auth]
       summary: Registrasi akun (Konsumen atau UMKM)
+      description: Registrasi publik hanya menerima role `consumer` atau `seller`. Akun `super_admin` dibuat melalui proses administratif, lalu login melalui endpoint `/auth/login`.
       security: []
       requestBody:
         required: true
@@ -106,6 +107,7 @@ paths:
     post:
       tags: [Auth]
       summary: Login
+      description: Login untuk akun yang sudah terdaftar, termasuk akun `super_admin`.
       security: []
       requestBody:
         required: true
@@ -1551,7 +1553,12 @@ components:
     RegisterRequest:
       type: object
       required: [full_name, password, role]
-      description: Wajib mengisi `email` atau `phone`.
+      description: Wajib mengisi `email` atau `phone`. Password minimal 8 karakter; role publik hanya `consumer` atau `seller`.
+      example:
+        full_name: Pengguna Test
+        email: consumer@example.com
+        password: GantiDenganPassword123!
+        role: consumer
       properties:
         full_name:
           type: string
