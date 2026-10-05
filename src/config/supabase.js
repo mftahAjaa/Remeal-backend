@@ -35,3 +35,9 @@ export function supabaseForUser(token) {
     },
   });
 }
+
+export function createAnonClient() {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: authOptions,
+  });
+}

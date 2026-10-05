@@ -1,5 +1,5 @@
 // src/services/auth.service.js
-import { supabaseAdmin } from '../config/supabase.js';
+import { supabaseAdmin, createAnonClient } from '../config/supabase.js';
 import { AppError } from '../utils/errors.js';
 import { mapDbError } from '../utils/dbError.js';
 
@@ -75,7 +75,7 @@ export async function register(input) {
 }
 
 export async function sendOtp({ identifier }) {
-  const { error } = await supabaseAdmin.auth.signInWithOtp({
+  const { error } = await createAnonClient().auth.signInWithOtp({
     ...credentialsForIdentifier(identifier),
   });
 
@@ -88,7 +88,7 @@ export async function sendOtp({ identifier }) {
 
 export async function verifyOtp({ identifier, otp }) {
   const type = isEmail(identifier) ? 'email' : 'sms';
-  const { data, error } = await supabaseAdmin.auth.verifyOtp({
+  const { data, error } = await createAnonClient().auth.verifyOtp({
     ...credentialsForIdentifier(identifier),
     token: otp,
     type,
@@ -102,7 +102,7 @@ export async function verifyOtp({ identifier, otp }) {
 }
 
 export async function login({ identifier, password }) {
-  const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+  const { data, error } = await createAnonClient().auth.signInWithPassword({
     ...credentialsForIdentifier(identifier),
     password,
   });
@@ -126,7 +126,7 @@ export async function logout(token) {
 export async function forgotPassword({ identifier }) {
   if (isEmail(identifier)) {
     try {
-      await supabaseAdmin.auth.resetPasswordForEmail(identifier);
+      await createAnonClient().auth.resetPasswordForEmail(identifier);
     } catch {
       // Keep the response identical whether or not the reset request succeeds.
     }
@@ -136,7 +136,7 @@ export async function forgotPassword({ identifier }) {
 }
 
 export async function resetPassword({ token, new_password }) {
-  const { data, error } = await supabaseAdmin.auth.verifyOtp({
+  const { data, error } = await createAnonClient().auth.verifyOtp({
     token_hash: token,
     type: 'recovery',
   });

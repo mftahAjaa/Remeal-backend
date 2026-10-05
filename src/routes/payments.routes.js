@@ -17,5 +17,11 @@ router.post(
   paymentsController.createPayment,
 );
 router.post('/payments/webhook', paymentsController.webhook);
+router.post(
+  '/payments/simulate',
+  requireAuth,
+  requireRole('consumer'),
+  paymentsController.simulatePayment
+);
 
 export default router;

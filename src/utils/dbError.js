@@ -42,5 +42,6 @@ export function mapDbError(err) {
     return new AppError(mappedError[0], code, mappedError[1]);
   }
 
-  return new AppError(500, 'INTERNAL_SERVER_ERROR', 'Terjadi kesalahan pada server.');
+  console.error('Unhandled Database Error:', err);
+  return new AppError(500, 'INTERNAL_SERVER_ERROR', 'Terjadi kesalahan pada server.', { original_message: err?.message });
 }

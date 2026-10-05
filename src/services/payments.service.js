@@ -59,7 +59,7 @@ export async function createOrderPayment(consumerId, orderId, method) {
       qris_payload: charge.qrisPayload,
       expires_at: charge.expiresAt,
     })
-    .select('id, order_id, method, amount, status, payment_url, qris_payload, expires_at')
+    .select('id, order_id, method, amount, status, payment_url, qris_payload, expires_at, external_id')
     .single();
 
   if (insertError) throw mapDbError(insertError);
@@ -91,4 +91,22 @@ export async function processPaymentWebhook(body, rawBody) {
   }
 
   return { message: 'Webhook diterima.' };
+}
+
+export async function simulatePaymentSuccess(externalId) {
+  if (process.env.PAYMENT_PROVIDER && process.env.PAYMENT_PROVIDER !== 'mock') {
+    throw new AppError(400, 'BAD_REQUEST', 'Simulasi hanya dapat digunakan pada mode mock.');
+  }
+
+  const { error } = await supabaseAdmin.rpc('process_payment_webhook', {
+    p_external_id: externalId,
+    p_status: 'paid',
+    p_payload: { simulated: true },
+  });
+
+  if (error) {
+    throw mapDbError(error);
+  }
+
+  return { message: 'Pembayaran berhasil disimulasikan.' };
 }

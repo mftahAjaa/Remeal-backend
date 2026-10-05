@@ -6,6 +6,7 @@ import { upload } from '../middleware/upload.js';
 const router = Router();
 
 // Endpoint upload foto (hanya untuk user terautentikasi)
-router.post('/upload', requireAuth, upload.single('file'), uploadController.uploadPhoto);
+// Contoh penggunaan: POST /upload/avatars atau POST /upload/product-photos
+router.post('/upload/:bucket', requireAuth, upload.single('file'), uploadController.uploadPhoto);
 
 export default router;
