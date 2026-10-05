@@ -14,6 +14,10 @@ export const registerSchema = z
     path: ['email'],
   });
 
+export const sendOtpSchema = z.object({
+  identifier: z.string().trim().min(1),
+});
+
 export const verifyOtpSchema = z.object({
   identifier: z.string().trim().min(1),
   otp: z.string().trim().min(1),

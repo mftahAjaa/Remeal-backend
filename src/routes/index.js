@@ -13,6 +13,7 @@ import sellerOrdersRoutes from './seller-orders.routes.js';
 import sellerDashboardRoutes from './seller-dashboard.routes.js';
 import sellerProductsRoutes from './seller-products.routes.js';
 import storesRoutes from './stores.routes.js';
+import uploadRoutes from './upload.routes.js';
 
 const routes = Router();
 
@@ -29,5 +30,6 @@ routes.use(complaintsRoutes);
 routes.use(adminRoutes);
 routes.use(sellerProductsRoutes);
 routes.use(sellerDashboardRoutes);
+routes.use(uploadRoutes);
 
 export default routes;

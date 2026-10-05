@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-  "test": "node --test tests/orang-a.test.js tests/admin-validation.test.js tests/products-validation.test.js tests/reviews-validation.test.js tests/routes-auth.test.js tests/stage1-validation.test.js",
+    "test": "node --test tests/orang-a.test.js tests/admin-validation.test.js tests/products-validation.test.js tests/reviews-validation.test.js tests/routes-auth.test.js tests/stage1-validation.test.js",
     "test:integration": "node --test tests/supabase.integration.test.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js"
@@ -27,6 +27,7 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "morgan": "^1.12.1",
+    "multer": "^2.4.0",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

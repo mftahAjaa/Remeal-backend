@@ -64,13 +64,26 @@ export async function register(input) {
     throw new AppError(409, 'CONFLICT', 'Email atau nomor HP sudah terdaftar.');
   }
   if (error) {
-    throw new AppError(500, 'INTERNAL_SERVER_ERROR', 'Registrasi gagal diproses.');
+    console.error('Supabase Register Error:', error);
+    throw new AppError(500, 'INTERNAL_SERVER_ERROR', `Registrasi gagal diproses: ${error.message}`);
   }
   if (data.user && data.user.identities?.length === 0) {
     throw new AppError(409, 'CONFLICT', 'Email atau nomor HP sudah terdaftar.');
   }
 
   return { message: 'Registrasi berhasil. Silakan verifikasi akun Anda.' };
+}
+
+export async function sendOtp({ identifier }) {
+  const { error } = await supabaseAdmin.auth.signInWithOtp({
+    ...credentialsForIdentifier(identifier),
+  });
+
+  if (error) {
+    throw new AppError(400, 'SEND_OTP_FAILED', 'Gagal mengirim kode OTP.');
+  }
+
+  return { message: 'Kode OTP telah dikirim.' };
 }
 
 export async function verifyOtp({ identifier, otp }) {
