@@ -17,7 +17,7 @@ function isDuplicateAuthError(error) {
     .some((indicator) => message.includes(indicator));
 }
 
-async function getProfile(userId) {
+export async function getProfile(userId, authUser) {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('*')
@@ -25,11 +25,39 @@ async function getProfile(userId) {
     .maybeSingle();
 
   if (error) throw mapDbError(error);
-  if (!data) {
-    throw new AppError(404, 'NOT_FOUND', 'Profil pengguna tidak ditemukan.');
+  if (data) return data;
+
+  const metadata = authUser?.user_metadata ?? {};
+  const fullName = typeof metadata.full_name === 'string' ? metadata.full_name : '';
+  const metadataPhone = typeof metadata.phone === 'string' ? metadata.phone : null;
+  const { data: createdProfile, error: createError } = await supabaseAdmin
+    .from('profiles')
+    .insert({
+      id: userId,
+      full_name: fullName,
+      email: authUser?.email || null,
+      phone: authUser?.phone || metadataPhone,
+      role: metadata.role === 'seller' ? 'seller' : 'consumer',
+      is_verified: Boolean(authUser?.email_confirmed_at || authUser?.phone_confirmed_at),
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (!createError && createdProfile) return createdProfile;
+
+  if (createError?.code === '23505') {
+    const { data: existingProfile, error: lookupError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (lookupError) throw mapDbError(lookupError);
+    if (existingProfile) return existingProfile;
   }
 
-  return data;
+  if (createError) throw mapDbError(createError);
+  throw new AppError(500, 'PROFILE_CREATION_FAILED', 'Profil pengguna tidak dapat dibuat.');
 }
 
 async function createAuthResponse(session, authUser) {
@@ -41,7 +69,7 @@ async function createAuthResponse(session, authUser) {
     access_token: session.access_token,
     refresh_token: session.refresh_token,
     expires_in: session.expires_in ?? 0,
-    user: await getProfile(authUser.id),
+    user: await getProfile(authUser.id, authUser),
   };
 }
 
