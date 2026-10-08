@@ -41,3 +41,8 @@ seed-products.js
 seed-reviews.js
 seed-sellers.js
 sellers-credentials.md
+node_modules/
+.env
+error_logs.txt
+.idea/
+.vscode/
