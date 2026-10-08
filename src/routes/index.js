@@ -14,6 +14,7 @@ import sellerDashboardRoutes from './seller-dashboard.routes.js';
 import sellerProductsRoutes from './seller-products.routes.js';
 import storesRoutes from './stores.routes.js';
 import uploadRoutes from './upload.routes.js';
+import statsRoutes from './stats.routes.js';
 
 const routes = Router();
 
@@ -31,5 +32,6 @@ routes.use(adminRoutes);
 routes.use(sellerProductsRoutes);
 routes.use(sellerDashboardRoutes);
 routes.use(uploadRoutes);
+routes.use(statsRoutes);
 
 export default routes;

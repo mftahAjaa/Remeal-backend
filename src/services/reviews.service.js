@@ -43,11 +43,24 @@ function getReviewUpdates(input) {
 }
 
 export async function createReview(consumerId, orderId, input) {
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('id, store_id, product_id, status, consumer_id')
+    .eq('id', orderId)
+    .single();
+
+  if (orderError) throw mapDbError(orderError);
+  if (!order) throw new AppError(404, 'ORDER_NOT_FOUND', 'Pesanan tidak ditemukan.');
+  if (order.consumer_id !== consumerId) throw new AppError(403, 'FORBIDDEN', 'Bukan pesanan Anda.');
+  if (order.status !== 'completed') throw new AppError(400, 'BAD_REQUEST', 'Hanya pesanan selesai yang dapat diulas.');
+
   const { data, error } = await supabaseAdmin
     .from('reviews')
     .insert({
       order_id: orderId,
       consumer_id: consumerId,
+      store_id: order.store_id,
+      product_id: order.product_id,
       ...getReviewUpdates(input),
     })
     .select(reviewSelect)

@@ -37,3 +37,7 @@ remeal-api.postman_collection.json
 docs/postman/remeal-api.postman_collection.json
 # Keep local planning files out of commits.
 
+seed-products.js
+seed-reviews.js
+seed-sellers.js
+sellers-credentials.md
